@@ -30,11 +30,31 @@ Modelo das instruções de ADD e SUB:
 	 Exemplo:
 	 0b000000011000000010000001001101110 -> 00000011 | 00000001 | 00000010 | 01101110
 	 Realiza o ADD(01101110) do registrador A(00000001) com o registrador B(00000010) e armazena o resultado no registrador destino(00000011)
+	 
+Memória Cache:
+	 
+	 A linha de cache possui um bit de validação, uma tag, e 8 posições para as words (correspondentes às colunas da cache);
+	 Essa memória cache possui 8 linhas;
+	 
+       (Tag)     (Linha de Cache)  (Coluna de Cache - Words)
+	  26 bits         3 bits                 3 bits
+	  
+	 Exemplo:
+	 0b00000000000000000000000000000001 -> 00000000000000000000000000 | 000 | 001
+ 	 Neste caso a busca é feita na primeira linha da cache (000 - linha 0), e na segunda coluna (001 - coluna 1), com a Tag 00000000000000000000000000.
+
 */
 
 #include <iostream>
 
 using namespace std;
+
+//Linha da memória cache
+struct linhaMemoriaCache{
+	bool bitValidacao;
+	unsigned int tag;
+	unsigned int dados[8];
+};
 
 unsigned int memoriaDeDados[] = {1, 2, 0, 4, 8, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	
@@ -54,6 +74,13 @@ unsigned int registradorDestino;
 unsigned int registradorOrigem;
 unsigned int posicaoMemoriaDados;
 unsigned int registrador[256];
+unsigned int tagCache;
+unsigned int linhaCache;
+unsigned int colunaCache;
+
+
+//Cache
+linhaMemoriaCache memoriaCache[8];
 
 void decodificar(){
 	
@@ -104,7 +131,31 @@ void executar(){
 	}	
 }
 
+int procurarNaCache(int PC){
+	tagCache = PC >> 6;
+	tagCache = tagCache & 0b000000111111111111111111111111111111;
+	linhaCache = PC >> 3;
+	linhaCache = linhaCache & 0b0000000000000000000000000000000000000111;
+	colunaCache = colunaCache & 0b0000000000000000000000000000000000000111;
+	
+	if(memoriaCache[linhaCache].bitValidacao == true && tagCache == memoriaCache[linhaCache].tag)
+		return memoriaCache[linhaCache].dados[colunaCache];
+	else{
+		for(int i = 0; i < 8; i++)
+		{
+			memoriaCache[linhaCache].dados[i] = memoriaDePrograma[PC + i];
+		}
+		memoriaCache[linhaCache].bitValidacao = true;
+		memoriaCache[linhaCache].tag = tagCache;
+		return memoriaCache[linhaCache].dados[colunaCache];
+	}
+}
+
 int main(){
+	
+	for(int i=0; i<4; i++){
+		memoriaCache[i].bitValidacao = false;
+	}
 	
 	PC = 0;
 	
@@ -113,7 +164,7 @@ int main(){
 	}
 	
 	while(PC < 4){
-		instrucao = memoriaDePrograma[PC];
+		instrucao = procurarNaCache(PC);
 		PC = PC + 1;
 		decodificar();
 		executar();
